@@ -4,7 +4,7 @@ mod dict;
 mod error;
 mod key;
 mod pages;
-mod resource;
+pub mod resource;
 mod headline;
 
 pub use media::Media;

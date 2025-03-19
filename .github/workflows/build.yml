@@ -1,0 +1,120 @@
+name: Build and Release
+
+on:
+    push:
+        branches:
+            - main
+
+env:
+    CARGO_TERM_COLOR: always
+
+jobs:
+    create_tag:
+        runs-on: ubuntu-latest
+        outputs:
+            new_tag: ${{ steps.create_tag.outputs.new_tag }}
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Get latest tag
+              id: get_latest_tag
+              run: echo "latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo v0.0.0)" >> $GITHUB_OUTPUT
+
+            - name: Create new tag
+              id: create_tag
+              run: |
+                  latest_tag=${{ steps.get_latest_tag.outputs.latest_tag }}
+                  major=$(echo $latest_tag | cut -d. -f1 | tr -d v)
+                  minor=$(echo $latest_tag | cut -d. -f2)
+                  patch=$(echo $latest_tag | cut -d. -f3)
+
+                  if [ "$major" = "0" ] && [ "$minor" = "0" ] && [ "$patch" = "0" ]; then
+                    new_tag="v1.0.0"
+                  else
+                    new_tag="v$major.$minor.$((patch + 1))"
+                  fi
+
+                  echo "new_tag=$new_tag" >> $GITHUB_OUTPUT
+                  git config user.name github-actions
+                  git config user.email github-actions@github.com
+                  git tag $new_tag
+                  git push origin $new_tag
+
+    build:
+        needs: create_tag
+        name: Build on ${{ matrix.os }}
+        runs-on: ${{ matrix.os }}
+        strategy:
+            matrix:
+                os: [ubuntu-latest, windows-latest, macos-latest]
+                include:
+                    - os: ubuntu-latest
+                      artifact_name: target/release/monokakido
+                      asset_name: rustkakido-linux
+                    - os: windows-latest
+                      artifact_name: target/release/monokakido.exe
+                      asset_name: rustkakido-windows.exe
+                    - os: macos-latest
+                      artifact_name: target/release/monokakido
+                      asset_name: rustkakido-macos
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Install Rust
+              uses: actions-rs/toolchain@v1
+              with:
+                  toolchain: stable
+                  override: true
+
+            - name: Cache dependencies
+              uses: actions/cache@v4.0.2
+              with:
+                  path: |
+                      ~/.cargo
+                      target
+                  key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+                  restore-keys: |
+                      ${{ runner.os }}-cargo-
+
+            - name: Build
+              run: cargo build --release --verbose
+
+            - name: Run tests
+              run: cargo test --verbose
+
+            - name: Upload artifact
+              uses: actions/upload-artifact@v3
+              with:
+                  name: ${{ matrix.asset_name }}
+                  path: ${{ matrix.artifact_name }}
+
+    release:
+        name: Create Release
+        needs: [create_tag, build]
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Create Release
+              id: create_release
+              uses: actions/create-release@v1
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  tag_name: ${{ needs.create_tag.outputs.new_tag }}
+                  release_name: Release ${{ needs.create_tag.outputs.new_tag }}
+                  draft: false
+                  prerelease: false
+
+            - name: Download artifacts
+              uses: actions/download-artifact@v3
+
+            - name: Upload Release Assets
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  for asset in rustkakido-*; do
+                    gh release upload ${{ needs.create_tag.outputs.new_tag }} "$asset" --clobber
+                  done

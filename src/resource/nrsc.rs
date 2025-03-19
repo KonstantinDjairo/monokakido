@@ -210,7 +210,7 @@ impl Nrsc {
         Ok(files)
     }
 
-    pub(crate) fn new(path: &Path) -> Result<Self, Error> {
+    pub fn new(path: &Path) -> Result<Self, Error> {
         let files = Nrsc::files(path)?;
         let index = NrscIndex::new(path)?;
         Ok(Nrsc {

@@ -280,7 +280,7 @@ impl Rsc {
         Ok(files)
     }
 
-    pub(crate) fn new(path: &Path, rsc_name: &str) -> Result<Self, Error> {
+    pub fn new(path: &Path, rsc_name: &str) -> Result<Self, Error> {
         let files = Rsc::files(path, rsc_name)?;
         let index = RscIndex::new(path, rsc_name)?;
         Ok(Self {

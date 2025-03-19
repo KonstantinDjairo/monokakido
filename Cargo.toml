@@ -9,3 +9,4 @@ license = "MIT"
 miniz_oxide = { version = "0.7", default-features = false }
 miniserde = "0.1"
 xmlparser = "0.13.5"
+toml = "0.5"

@@ -4,6 +4,7 @@ use std::{
     fs,
     path::{Path, PathBuf},
 };
+use toml::Value;
 
 use crate::{media::Media, key::Keys, pages::Pages, Error};
 
@@ -33,15 +34,35 @@ pub struct Paths {
     contents_dir: String,
 }
 
+impl AsRef<Path> for Paths {
+    fn as_ref(&self) -> &Path {
+        &self.base_path
+    }
+}
+
 impl Paths {
-    fn std_list_path() -> PathBuf {
-        PathBuf::from(
-            "/Library/Application Support/AppStoreContent/jp.monokakido.Dictionaries/Products/",
-        )
+    fn read_config() -> Result<String, Box<dyn std::error::Error>> {
+        let config_str = fs::read_to_string("config.toml")?;
+        let config: Value = toml::from_str(&config_str)?;
+        
+        let dict_path = config["dict_path"].as_str()
+            .ok_or("dict_path not found or not a string")?
+            .to_string();
+    
+        Ok(dict_path)
+    }
+
+    fn list_path() -> PathBuf {
+        Self::read_config()
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| {
+                // Fallback to default path if config reading fails
+                PathBuf::from("/Library/Application Support/AppStoreContent/jp.monokakido.Dictionaries/Products/")
+            })
     }
 
     fn std_dict_path(name: &str) -> PathBuf {
-        let mut path = Paths::std_list_path();
+        let mut path = Paths::list_path();
         path.push(format!("jp.monokakido.Dictionaries.{name}"));
         path
     }
@@ -61,9 +82,7 @@ impl Paths {
     }
 
     pub(crate) fn key_path(&self) -> PathBuf {
-        let mut pb = PathBuf::from(&self.base_path);
-        pb.push("Contents");
-        pb.push(&self.contents_dir);
+        let mut pb = self.contents_path();
         pb.push("key");
         pb
     }
@@ -75,9 +94,7 @@ impl Paths {
     }
 
     pub(crate) fn headline_path(&self) -> PathBuf {
-        let mut pb = PathBuf::from(&self.base_path);
-        pb.push("Contents");
-        pb.push(&self.contents_dir);
+        let mut pb = self.contents_path();
         pb.push("headline");
         pb
     }
@@ -97,7 +114,7 @@ fn parse_dict_name(fname: &OsStr) -> Option<&str> {
 
 impl MonokakidoDict {
     pub fn list() -> Result<impl Iterator<Item = Result<String, Error>>, Error> {
-        let iter = fs::read_dir(Paths::std_list_path()).map_err(|_| Error::IOError)?;
+        let iter = fs::read_dir(Paths::list_path()).map_err(|_| Error::IOError)?;
         Ok(iter.filter_map(|entry| {
             entry
                 .map_err(|_| Error::IOError)
@@ -138,7 +155,7 @@ impl MonokakidoDict {
         let pages = Pages::new(&paths)?;
         let audio = Media::new(&paths)?;
         let graphics = Media::new(&paths)?;
-        let keys = Keys::new(&paths)?;
+        let keys = Keys::new(paths.contents_path())?;
 
         Ok(MonokakidoDict {
             paths,
