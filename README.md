@@ -2,6 +2,22 @@
 A Rust library for parsing and interpreting the [Monokakido](https://www.monokakido.jp/en/dictionaries/app/) dictionary format.
 Aiming for full test coverage and efficient implementation with minimal dependencies.
 
+
+## usage:
+This must be used as a library, rather than a program, so for parsing the actual dictionaries, you should use [this cli](https://git.ajattix.org/hashirama/mkd-utils)<br></br>
+In linux (or any other unix):
+```shell
+$ ./target/release/mkd-utils -e -o le_output/ scan-dict ../Monokakido\ Dictionaries/Portugues/
+```
+another example with another dictionary:
+```shell
+$ ./target/release/mkd-utils -e -o le_output/ scan-dict ../Monokakido\ Dictionaries/Portugues/KANKENKJ2/
+```
+the output will be a folder with xml files, which are human-readable, and a simple script can parse it: 
+
+<img src="https://github.com/user-attachments/assets/d614631b-794e-4914-aeef-226f25eb90cc" width="40%" />
+
+
 ## Notice
 
 This library started as a personal project driven by curiosity.
